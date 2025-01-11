@@ -13,6 +13,7 @@
 from os import path,makedirs
 import numpy as np
 from scipy import ndimage
+from scipy.ndimage import fourier_gaussian
 from matplotlib import pyplot
 import png
 import threading
@@ -48,7 +49,7 @@ def FindLargestVoid(BinaryPattern,StandardDeviation):
     # Apply the Gaussian. We do not want to cut off the Gaussian at all because even 
     # the tiniest difference can change the ranking. Therefore we apply the Gaussian 
     # through a fast Fourier transform by means of the convolution theorem.
-    FilteredArray=np.fft.ifftn(ndimage.fourier.fourier_gaussian(np.fft.fftn(np.where(BinaryPattern,1.0,0.0)),StandardDeviation)).real;
+    FilteredArray=np.fft.ifftn(fourier_gaussian(np.fft.fftn(np.where(BinaryPattern,1.0,0.0)),StandardDeviation)).real;
     # Find the largest void
     return np.argmin(np.where(BinaryPattern,2.0,FilteredArray));
 
@@ -59,7 +60,7 @@ def FindTightestCluster(BinaryPattern,StandardDeviation):
       \sa GetVoidAndClusterBlueNoise"""
     if(np.count_nonzero(BinaryPattern)*2>=np.size(BinaryPattern)):
         BinaryPattern=np.logical_not(BinaryPattern);
-    FilteredArray=np.fft.ifftn(ndimage.fourier.fourier_gaussian(np.fft.fftn(np.where(BinaryPattern,1.0,0.0)),StandardDeviation)).real;
+    FilteredArray=np.fft.ifftn(fourier_gaussian(np.fft.fftn(np.where(BinaryPattern,1.0,0.0)),StandardDeviation)).real;
     return np.argmax(np.where(BinaryPattern,FilteredArray,-1.0));
 
 
@@ -103,7 +104,7 @@ def GetVoidAndClusterBlueNoise(OutputShape,StandardDeviation=1.5,InitialSeedFrac
         else:
             InitialBinaryPattern.flat[iLargestVoid]=True;
     # Rank all pixels
-    DitherArray=np.zeros(OutputShape,dtype=np.int);
+    DitherArray=np.zeros(OutputShape,dtype=int);
     # Phase 1: Rank minority pixels in the initial binary pattern
     BinaryPattern=np.copy(InitialBinaryPattern);
     for Rank in range(nInitialOne-1,-1,-1):
@@ -164,7 +165,7 @@ def AnalyzeNoiseTexture(Texture,SingleFigure=True,SimpleLabels=False):
     X,Y=np.meshgrid(range(DFT.shape[1]),range(DFT.shape[0]));
     X-=int(DFT.shape[1]/2);
     Y-=int(DFT.shape[0]/2);
-    RadialFrequency=np.asarray(np.round(np.sqrt(X**2+Y**2)),dtype=np.int);
+    RadialFrequency=np.asarray(np.round(np.sqrt(X**2+Y**2)),dtype=int);
     RadialPower=np.zeros((np.max(RadialFrequency)-1,));
     DFT[int(DFT.shape[0]/2),int(DFT.shape[1]/2)]=0.0;
     for i in range(RadialPower.shape[0]):
@@ -173,8 +174,8 @@ def AnalyzeNoiseTexture(Texture,SingleFigure=True,SimpleLabels=False):
     # Plot the distribution of power over angular frequency ranges
     PrepareAxes(4,title="Anisotropy (angular power distribution)",aspect="equal",xlabel="Frequency x" if SimpleLabels else "$\\omega_x$",ylabel="Frequency y" if SimpleLabels else "$\\omega_y$");
     CircularMask=np.logical_and(0<RadialFrequency,RadialFrequency<int(min(DFT.shape[0],DFT.shape[1])/2));
-    NormalizedX=np.asarray(X,dtype=np.float)/np.maximum(1.0,np.sqrt(X**2+Y**2));
-    NormalizedY=np.asarray(Y,dtype=np.float)/np.maximum(1.0,np.sqrt(X**2+Y**2));
+    NormalizedX=np.asarray(X,dtype=float)/np.maximum(1.0,np.sqrt(X**2+Y**2));
+    NormalizedY=np.asarray(Y,dtype=float)/np.maximum(1.0,np.sqrt(X**2+Y**2));
     BinningAngle=np.linspace(0.0,2.0*np.pi,33);
     AngularPower=np.zeros_like(BinningAngle);
     for i,Angle in enumerate(BinningAngle):
@@ -397,11 +398,15 @@ def UniformToTriangularDistribution(UniformTexture):
              np.size(UniformTexture)-1 exactly once.
       \return A floating-point array with values between -1 and 1 where the density 
               grows linearly between -1 and 0 and falls linearly between 0 and 1."""
-    Normalized=(np.asarray(UniformTexture,dtype=np.float)+0.5)/float(np.size(UniformTexture));
+    Normalized=(np.asarray(UniformTexture,dtype=float)+0.5)/float(np.size(UniformTexture));
     return np.where(Normalized<0.5,np.sqrt(2.0*Normalized)-1.0,1.0-np.sqrt(2.0-2.0*Normalized));
 
 
 if(__name__=="__main__"):
+    GenerateBlueNoiseDatabase(range(1),512,512,[1],1.9);
+    
+    #(RandomSeedIndexList=range(1),MinResolution=16,MaxResolution=1024,ChannelCountList=[1,2,3,4],StandardDeviation=1.5):
+    
     #GenerateBlueNoiseDatabase(range(64),16,64,range(1,5),1.9);
     #GenerateBlueNoiseDatabase(range(16),128,128,range(1,5),1.9);
     #GenerateBlueNoiseDatabase(range(8),256,256,range(1,5),1.9);
@@ -414,8 +419,8 @@ if(__name__=="__main__"):
         #ChannelNames=["","L","LA","RGB","RGBA"][nChannel];
         #GenerateNDBlueNoiseTexture((8,8,8,8),nChannel,"../Data/8_8_8_8/HDR_"+ChannelNames+".raw",1.9);
         #GenerateNDBlueNoiseTexture((16,16,16,16),nChannel,"../Data/16_16_16_16/HDR_"+ChannelNames+".raw",1.9);
-    Texture=GetVoidAndClusterBlueNoise((64,64),1.9);
-    #Texture=GetVoidAndClusterBlueNoise((32,32,32),1.9)[:,:,0];
-    AnalyzeNoiseTexture(Texture,True);
-    PlotBinaryPatterns(Texture,3,5);
-    pyplot.show();
+    #Texture=GetVoidAndClusterBlueNoise((64,64),1.9);
+    ##Texture=GetVoidAndClusterBlueNoise((32,32,32),1.9)[:,:,0];
+    #AnalyzeNoiseTexture(Texture,True);
+    #PlotBinaryPatterns(Texture,3,5);
+    #pyplot.show();
